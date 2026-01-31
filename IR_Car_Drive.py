@@ -17,7 +17,7 @@ except ImportError:
         def read_data_array(self, reg, count):
             return [255] # Return no key by default
         def Ctrl_WQ2812_ALL(self, state, color):
-            pass
+            print(f"Mock Lights: State={state}, Color={color}")
 
 # IR Remote Key Codes (NEC Protocol)
 # Based on Yahboom Raspbot V2 documentation
@@ -55,16 +55,34 @@ class IR_Remote_Car:
             
         self.speed = 100  # Default speed (0-255)
         self.running = True
-        self.last_key_time = 0
-        self.current_action = None
         
-        # Enable IR Receiver
+        # Light state management
+        self.light_colors = [0, 1, 2, 3, 4, 5, 6] # Red, Green, Blue, Yellow, Purple, Cyan, White
+        self.current_light_index = -1 # -1 means Off
+        
+        # Enable IR Receiver and Reset Lights
         try:
             self.bot.Ctrl_IR_Switch(1)
-            print("IR Receiver Enabled")
+            self.bot.Ctrl_WQ2812_ALL(0, 0)
+            print("IR Receiver Enabled and Lights Reset")
         except Exception as e:
-            print(f"Error enabling IR: {e}")
+            print(f"Error initializing hardware: {e}")
         
+    def toggle_lights(self):
+        """Cycle through colors and off state"""
+        self.current_light_index += 1
+        
+        if self.current_light_index >= len(self.light_colors):
+            # Turn lights off
+            self.current_light_index = -1
+            self.bot.Ctrl_WQ2812_ALL(0, 0)
+            print("Lights Off")
+        else:
+            # Set next color
+            color = self.light_colors[self.current_light_index]
+            self.bot.Ctrl_WQ2812_ALL(1, color)
+            print(f"Lights On: Color Index {color}")
+
     def drive_car(self, direction):
         """
         Control motor movements based on direction.
@@ -143,6 +161,10 @@ class IR_Remote_Car:
             self.drive_car('stop')
         elif key_code == IR_KEYS['Zero'] or key_code == IR_KEYS['Five']: # 5/0 also Stop if desired
             self.drive_car('stop')
+        
+        # Light control
+        elif key_code == IR_KEYS['Light']:
+            self.toggle_lights()
 
         # Speed controls
         elif key_code == IR_KEYS['Plus']:
@@ -164,17 +186,10 @@ class IR_Remote_Car:
                 if data and len(data) > 0:
                     code = data[0]
                     
-                    # 255 usually means no key press (or idle line)
+                    # 255 usually means no key press
                     if code != 255:
-                        # Debounce/One-shot logic:
-                        # Only react if the code changed? 
-                        # Or if we want to allow holding down 'plus' to increase speed?
-                        # For movement, we are using state (Move until Stop), so receiving 'Up' repeatedly is fine.
-                        
-                        # Just handle it.
                         self.handle_key(code)
-                        
-                        # Wait a bit to avoid flooding
+                        # Wait a bit to avoid flooding and to act as a simple debounce
                         time.sleep(0.15)
                     
                 time.sleep(0.05)
@@ -185,6 +200,7 @@ class IR_Remote_Car:
     def cleanup(self):
         print("\nStopping...")
         self.bot.Ctrl_IR_Switch(0)
+        self.bot.Ctrl_WQ2812_ALL(0, 0) # Turn off lights
         self.drive_car('stop')
 
 def main():

@@ -33,6 +33,7 @@ This project contains a Python script `IR_Car_Drive.py` designed to control the 
 | **Right** | Slide Right (Mechanum) |
 | **Turn Left** | Rotate Left |
 | **Turn Right** | Rotate Right |
+| **Light** | Cycle LED Colors / Off |
 | **Power** | Stop |
 | **0 / 5** | Stop |
 | **+** | Increase Speed |
