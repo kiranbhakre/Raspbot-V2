@@ -12,11 +12,12 @@ class ObstacleAvoidance:
         self.DEFAULT_SPEED = 40  # Slower speed for safety
         
         # State Machine
-        self.state = 'IDLE' # IDLE, FORWARD, BACKING_UP, TURNING
+        self.state = 'IDLE' 
         self.state_start_time = 0
         self.last_check_time = 0
 
     def start(self):
+        print("DEBUG: AutoDriver START requested")
         self.car.enable_ultrasonic(True)
         self.car.set_speed(self.DEFAULT_SPEED)
         self.running = True
@@ -26,6 +27,7 @@ class ObstacleAvoidance:
         print(f"Obstacle Avoidance Started")
 
     def stop(self):
+        print("DEBUG: AutoDriver STOP requested")
         self.running = False
         self.car.enable_ultrasonic(False)
         self.car.stop()
@@ -33,44 +35,38 @@ class ObstacleAvoidance:
         print("Obstacle Avoidance Mode Stopped")
 
     def step(self):
-        """
-        Non-blocking step function.
-        """
         if not self.running:
             return
 
         current_time = time.time()
         
-        # --- State Machine Logic ---
-        
         if self.state == 'BACKING_UP':
-            # Check if we are done backing up (0.5s duration)
             if current_time - self.state_start_time > 0.5:
+                print("DEBUG: Finished Backing Up -> Moving Forward")
                 self.car.stop()
-                self.state = 'FORWARD' # Try moving forward/checking again
+                self.state = 'FORWARD' 
             return
 
         elif self.state == 'TURNING':
-            # Check if we are done turning (0.4s duration)
             if current_time - self.state_start_time > 0.4:
+                print("DEBUG: Finished Turning -> Moving Forward")
                 self.car.stop()
                 self.state = 'FORWARD'
             return
             
         elif self.state == 'FORWARD':
-            # We are moving forward Use throttling to avoid I2C flooding
-            # Only check sensors every 100ms (0.1s)
-            
+            # Throttling
             if current_time - self.last_check_time < 0.1:
-                return # Skip checking this loop iteration
+                return 
             
             self.last_check_time = current_time
             
-            # Now we check
+            # print("DEBUG: Reading Sensor...")
             dis = self.car.get_distance()
+            # print(f"DEBUG: Distance = {dis}mm")
             
-            # Safety checks for bad readings
             if dis == 0 or dis > 4500:
+                # print("DEBUG: Invalid sensor read")
                 self.car.stop()
                 return
 
@@ -89,7 +85,4 @@ class ObstacleAvoidance:
                 self.state_start_time = current_time
                 
             else:
-                # Path Clear, ensure moving forward
-                # Repeating this command might flood I2C too if not careful
-                # But since we are throttled to 10hz, it should be fine.
                 self.car.move_forward()
