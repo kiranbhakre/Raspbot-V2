@@ -6,18 +6,16 @@ class ObstacleAvoidance:
         self.car = car_driver
         self.running = False
         
-        # Constants from reference code
-        self.NEAR_DISTANCE = 200 # mm
-        self.FAR_DISTANCE = 425  # mm
-        self.DEFAULT_SPEED = 50  # Slower speed for autonomous mode
+        # Tuning for better safety
+        self.NEAR_DISTANCE = 300 # Increased from 200 to 300 mm (30cm) for earlier braking
+        self.FAR_DISTANCE = 500  # Increased to 500 mm (50cm)
+        self.DEFAULT_SPEED = 40  # Slower speed for better reaction time
 
     def start(self):
         self.car.enable_ultrasonic(True)
-        # Store previous speed to restore later? 
-        # For now, just set a safe speed
         self.car.set_speed(self.DEFAULT_SPEED)
         self.running = True
-        print("Obstacle Avoidance Mode Started")
+        print(f"Obstacle Avoidance Started (Safe Distance: {self.NEAR_DISTANCE}mm)")
 
     def stop(self):
         self.running = False
@@ -28,33 +26,40 @@ class ObstacleAvoidance:
     def step(self):
         """
         Execute one step of the avoidance logic.
-        Should be called in the main loop.
         """
         if not self.running:
             return
 
         dis = self.car.get_distance()
-        # print(f"Distance: {dis} mm")
+        
+        # Valid range check
+        if dis == 0:
+            # 0 sometimes means "Out of Range" (> 4m), but can be a glitch.
+            # To be safe, if we see 0, we can just keep doing what we were doing or stop.
+            # Let's print it to debug.
+            # print("Sensor read 0")
+            return
 
         if dis < self.NEAR_DISTANCE:
-            print(f"Obstacle Very Close ({dis}mm): Backing Up")
+            # Emergency Stop & Back up
+            print(f"OBSTACLE ({dis}mm)! Backing up...")
+            self.car.stop() # Ensure forward momentum breaks
+            time.sleep(0.05)
             self.car.move_backward()
-            time.sleep(0.1) 
+            time.sleep(0.3) # Back up for longer
             
-        elif self.NEAR_DISTANCE <= dis <= self.FAR_DISTANCE:
-            print(f"Obstacle Detected ({dis}mm): Turning Left")
+        elif dis <= self.FAR_DISTANCE:
+            # Too close to proceed, turn away
+            print(f"Object detected ({dis}mm). Turning...")
             self.car.stop()
             time.sleep(0.1)
             self.car.rotate_left()
-            time.sleep(0.15)
-            
-        elif dis > self.FAR_DISTANCE:
-            # Clear path
-            self.car.move_forward()
+            time.sleep(0.25)
             
         else:
-            # Unknown/Error (e.g. 0 reading?)
-            self.car.stop()
+            # Clear path
+            # print(f"Path Clear ({dis}mm)")
+            self.car.move_forward()
             
-        # Small delay to prevent I2C flooding
-        time.sleep(0.1) 
+        # Pacing
+        time.sleep(0.05)
