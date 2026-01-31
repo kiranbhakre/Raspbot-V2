@@ -7,9 +7,9 @@ class ObstacleAvoidance:
         self.running = False
         
         # Tuning for better safety
-        self.NEAR_DISTANCE = 300 # Increased from 200 to 300 mm (30cm) for earlier braking
-        self.FAR_DISTANCE = 500  # Increased to 500 mm (50cm)
-        self.DEFAULT_SPEED = 40  # Slower speed for better reaction time
+        self.NEAR_DISTANCE = 300 # Back up if closer than 30cm
+        self.FAR_DISTANCE = 500  # Turn if closer than 50cm
+        self.DEFAULT_SPEED = 40  # Slower speed for safety
 
     def start(self):
         self.car.enable_ultrasonic(True)
@@ -32,33 +32,34 @@ class ObstacleAvoidance:
 
         dis = self.car.get_distance()
         
-        # Valid range check
-        if dis == 0:
-            # 0 sometimes means "Out of Range" (> 4m), but can be a glitch.
-            # To be safe, if we see 0, we can just keep doing what we were doing or stop.
-            # Let's print it to debug.
-            # print("Sensor read 0")
+        # SAFETY CHECK: 0 usually means error/timeout.
+        # If we ignore it, the car keeps its previous state (moving).
+        # We MUST stop if we don't know where we are.
+        if dis == 0 or dis > 4500:
+            # print("Sensor Invalid (0mm). Stopping for safety.")
+            self.car.stop()
             return
+
+        # print(f"Auto Distance: {dis}mm")
 
         if dis < self.NEAR_DISTANCE:
             # Emergency Stop & Back up
             print(f"OBSTACLE ({dis}mm)! Backing up...")
-            self.car.stop() # Ensure forward momentum breaks
-            time.sleep(0.05)
+            self.car.stop() 
             self.car.move_backward()
-            time.sleep(0.3) # Back up for longer
+            time.sleep(0.4) # Commit to backing up for 0.4s
+            self.car.stop() # Then stop before reassessing
             
         elif dis <= self.FAR_DISTANCE:
             # Too close to proceed, turn away
             print(f"Object detected ({dis}mm). Turning...")
             self.car.stop()
-            time.sleep(0.1)
             self.car.rotate_left()
-            time.sleep(0.25)
+            time.sleep(0.3) # Commit to turning
+            self.car.stop()
             
         else:
             # Clear path
-            # print(f"Path Clear ({dis}mm)")
             self.car.move_forward()
             
         # Pacing
