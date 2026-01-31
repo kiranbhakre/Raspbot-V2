@@ -1,32 +1,23 @@
-import RPi.GPIO as GPIO
 import time
 import signal
 import sys
 
-# Try to import the YB_Pcb_Car library. 
-# If it doesn't exist (because we are not on the Raspbot image), we can use a mock for testing logic.
+# Try to import Raspbot library from the local file
 try:
-    from YB_Pcb_Car import YB_Pcb_Car
+    from Raspbot_Lib import Raspbot
 except ImportError:
-    print("Warning: YB_Pcb_Car library not found. Using Mock class for demonstration.")
-    class YB_Pcb_Car:
-        def Car_Run(self, speed1, speed2):
-            print(f"Car Run: speed1={speed1}, speed2={speed2}")
-        def Car_Back(self, speed1, speed2):
-            print(f"Car Back: speed1={speed1}, speed2={speed2}")
-        def Car_Left(self, speed1, speed2):
-            print(f"Car Left: speed1={speed1}, speed2={speed2}")
-        def Car_Right(self, speed1, speed2):
-            print(f"Car Right: speed1={speed1}, speed2={speed2}")
-        def Car_Spin_Left(self, speed1, speed2):
-            print(f"Car Spin Left: speed1={speed1}, speed2={speed2}")
-        def Car_Spin_Right(self, speed1, speed2):
-            print(f"Car Spin Right: speed1={speed1}, speed2={speed2}")
-        def Car_Stop(self):
-            print("Car Stop")
-        def Car_Run_Speed(self, speed):
-            # Assuming omnidirectional control might be simpler in some versions
-            print(f"Car Run Speed: {speed}")
+    print("Raspbot_Lib.py not found or smbus not available.")
+    print("Ensure Raspbot_Lib.py is in the same directory and smbus is installed (sudo apt-get install python3-smbus).")
+    # Mock for testing on non-Pi environments
+    class Raspbot:
+        def Ctrl_Car(self, motor_id, motor_dir, motor_speed):
+            print(f"Mock Ctrl_Car: id={motor_id}, dir={motor_dir}, speed={motor_speed}")
+        def Ctrl_IR_Switch(self, state):
+            print(f"Mock IR Switch: {state}")
+        def read_data_array(self, reg, count):
+            return [255] # Return no key by default
+        def Ctrl_WQ2812_ALL(self, state, color):
+            pass
 
 # IR Remote Key Codes (NEC Protocol)
 # Based on Yahboom Raspbot V2 documentation
@@ -54,91 +45,151 @@ IR_KEYS = {
     'Nine': 0x1A
 }
 
-# Pin definition for IR Receiver
-# Note: This often varies. Common pins are GPIO 17, 18 or specific pins on the expansion board.
-# Ensure this matches your hardware connection.
-PIN_IR = 17 
-
 class IR_Remote_Car:
     def __init__(self):
-        self.car = YB_Pcb_Car()
-        self.speed = 150  # Default speed
+        try:
+            self.bot = Raspbot()
+        except Exception as e:
+            print(f"Failed to initialize Raspbot: {e}")
+            sys.exit(1)
+            
+        self.speed = 100  # Default speed (0-255)
+        self.running = True
+        self.last_key_time = 0
+        self.current_action = None
         
-        # Initialize GPIO
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(PIN_IR, GPIO.IN)
+        # Enable IR Receiver
+        try:
+            self.bot.Ctrl_IR_Switch(1)
+            print("IR Receiver Enabled")
+        except Exception as e:
+            print(f"Error enabling IR: {e}")
         
+    def drive_car(self, direction):
+        """
+        Control motor movements based on direction.
+        L1=0, L2=1, R1=2, R2=3
+        Dir 0 = Forward, 1 = Backward
+        """
+        speed = self.speed
+        
+        if direction == 'stop':
+            for i in range(4):
+                self.bot.Ctrl_Car(i, 0, 0)
+            print("Car Stopped")
+                
+        elif direction == 'forward':
+            print("Moving Forward")
+            self.bot.Ctrl_Car(0, 0, speed) # L1 Fwd
+            self.bot.Ctrl_Car(1, 0, speed) # L2 Fwd
+            self.bot.Ctrl_Car(2, 0, speed) # R1 Fwd
+            self.bot.Ctrl_Car(3, 0, speed) # R2 Fwd
+            
+        elif direction == 'backward':
+            print("Moving Backward")
+            self.bot.Ctrl_Car(0, 1, speed) # L1 Back
+            self.bot.Ctrl_Car(1, 1, speed) # L2 Back
+            self.bot.Ctrl_Car(2, 1, speed) # R1 Back
+            self.bot.Ctrl_Car(3, 1, speed) # R2 Back
+            
+        elif direction == 'left': # Slide Left
+            print("Sliding Left")
+            self.bot.Ctrl_Car(0, 1, speed) # L1 Back
+            self.bot.Ctrl_Car(1, 0, speed) # L2 Fwd
+            self.bot.Ctrl_Car(2, 0, speed) # R1 Fwd
+            self.bot.Ctrl_Car(3, 1, speed) # R2 Back
+            
+        elif direction == 'right': # Slide Right
+            print("Sliding Right")
+            self.bot.Ctrl_Car(0, 0, speed) # L1 Fwd
+            self.bot.Ctrl_Car(1, 1, speed) # L2 Back
+            self.bot.Ctrl_Car(2, 1, speed) # R1 Back
+            self.bot.Ctrl_Car(3, 0, speed) # R2 Fwd
+            
+        elif direction == 'turn_left': # Rotate Left
+            print("Turning Left")
+            self.bot.Ctrl_Car(0, 1, speed) # L1 Back
+            self.bot.Ctrl_Car(1, 1, speed) # L2 Back
+            self.bot.Ctrl_Car(2, 0, speed) # R1 Fwd
+            self.bot.Ctrl_Car(3, 0, speed) # R2 Fwd
+            
+        elif direction == 'turn_right': # Rotate Right
+            print("Turning Right")
+            self.bot.Ctrl_Car(0, 0, speed) # L1 Fwd
+            self.bot.Ctrl_Car(1, 0, speed) # L2 Fwd
+            self.bot.Ctrl_Car(2, 1, speed) # R1 Back
+            self.bot.Ctrl_Car(3, 1, speed) # R2 Back
+
     def handle_key(self, key_code):
         """Execute action based on IR key code"""
-        print(f"Processing Key Code: {key_code}")
         
-        # Movement controls
+        if key_code > 0x1A: # Ignore unused codes or noise
+            return
+
+        # Map key codes to actions
         if key_code == IR_KEYS['Up']:
-            self.car.Car_Run(self.speed, self.speed)
+            self.drive_car('forward')
         elif key_code == IR_KEYS['Down']:
-            self.car.Car_Back(self.speed, self.speed)
+            self.drive_car('backward')
         elif key_code == IR_KEYS['Left']:
-            self.car.Car_Left(self.speed, self.speed)
+            self.drive_car('left')
         elif key_code == IR_KEYS['Right']:
-            self.car.Car_Right(self.speed, self.speed)
+            self.drive_car('right')
         elif key_code == IR_KEYS['Turn_Left']:
-            self.car.Car_Spin_Left(self.speed, self.speed)
+            self.drive_car('turn_left')
         elif key_code == IR_KEYS['Turn_Right']:
-            self.car.Car_Spin_Right(self.speed, self.speed)
-        elif key_code == IR_KEYS['Power']: # Uses Power button as Stop
-            self.car.Car_Stop()
-        
+            self.drive_car('turn_right')
+        elif key_code == IR_KEYS['Power']: 
+            self.drive_car('stop')
+        elif key_code == IR_KEYS['Zero'] or key_code == IR_KEYS['Five']: # 5/0 also Stop if desired
+            self.drive_car('stop')
+
         # Speed controls
         elif key_code == IR_KEYS['Plus']:
-            self.speed = min(255, self.speed + 10)
+            self.speed = min(255, self.speed + 20)
             print(f"Speed increased to {self.speed}")
         elif key_code == IR_KEYS['Minus']:
-            self.speed = max(0, self.speed - 10)
+            self.speed = max(20, self.speed - 20)
             print(f"Speed decreased to {self.speed}")
-            
-        else:
-            print("Unknown or Unmapped Key")
 
-    def read_ir(self):
-        """
-        Simple software-based IR reading. 
-        Note: For production, using 'lirc' or 'ir-keytable' with system drivers 
-        is much more reliable than Python polling. 
-        This is a simplified example of logic.
-        """
-        # In a real scenario without lirc, we would need a robust decoder function here,
-        # which counts pulse widths (NEC protocol: 9ms header, 4.5ms space, etc.)
-        # Since implementing a full NEC decoder in pure Python on a non-RTOS system
-        # like Raspberry Pi is flaky, we recommend using the system's 'lirc' or 'evdev'.
-        
-        # Placeholder for where you would integrate the 'lirc' read or 'evdev' event loop.
-        # For now, we wait for a raw input to simulate key presses for testing purposes
-        # if the hardware isn't attached.
-        print("Waiting for IR signal (Simulation mode: Use 'evdev' implementation for real hardware)")
-        # To actually drive this, you would typically use:
-        # import evdev
-        # device = evdev.InputDevice('/dev/input/eventX')
-        # for event in device.read_loop(): ...
-        pass
+    def loop(self):
+        print("Listening for IR signals... Press Ctrl+C to exit.")
+        last_code = 255
+        try:
+            while self.running:
+                # Read IR data
+                # 0x0C is the register for IR, reading 1 byte
+                data = self.bot.read_data_array(0x0c, 1)
+                
+                if data and len(data) > 0:
+                    code = data[0]
+                    
+                    # 255 usually means no key press (or idle line)
+                    if code != 255:
+                        # Debounce/One-shot logic:
+                        # Only react if the code changed? 
+                        # Or if we want to allow holding down 'plus' to increase speed?
+                        # For movement, we are using state (Move until Stop), so receiving 'Up' repeatedly is fine.
+                        
+                        # Just handle it.
+                        self.handle_key(code)
+                        
+                        # Wait a bit to avoid flooding
+                        time.sleep(0.15)
+                    
+                time.sleep(0.05)
+                
+        except KeyboardInterrupt:
+            self.cleanup()
 
     def cleanup(self):
-        self.car.Car_Stop()
-        GPIO.cleanup()
+        print("\nStopping...")
+        self.bot.Ctrl_IR_Switch(0)
+        self.drive_car('stop')
 
 def main():
     bot = IR_Remote_Car()
-    print("IR Remote Car Control Started")
-    print("Press Ctrl+C to exit")
-    
-    try:
-        # Example loop using a hypothetical 'lirc' socket or 'evdev' could go here.
-        # Since we don't have the library, we'll keep the process alive.
-        while True:
-            time.sleep(1)
-            
-    except KeyboardInterrupt:
-        print("\nStopping...")
-        bot.cleanup()
+    bot.loop()
 
 if __name__ == '__main__':
     main()

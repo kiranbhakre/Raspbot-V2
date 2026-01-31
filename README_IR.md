@@ -5,19 +5,19 @@ This project contains a Python script `IR_Car_Drive.py` designed to control the 
 
 ## Prerequisites
 
-1.  **Hardware Connection**: Ensure your IR receiver is connected to the correct GPIO pin (Default logic assumes a standard setup, but you may need to configure `lirc` or `dtoverlay`).
-2.  **Dependencies**:
-    *   `RPi.GPIO`
-    *   `YB_Pcb_Car.py`: This library is required to drive the motors. It is usually pre-installed on the Yahboom Raspbot image in `/home/pi/Yahboom_Project/Raspbot/`. If you are running this on a fresh install, we recommend downloading the driver from the [Yahboom Official Website](https://www.yahboom.net/study/Raspbot-V2) or copying it from the provided courses.
-
-3.  **Install Python Dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
+1.  **Hardware**: Yahboom Raspbot V2 with IR Receiver (enabled by the script).
+2.  **System**: Raspberry Pi with I2C enabled (`sudo raspi-config` -> Interface Options -> I2C).
+3.  **Dependencies**:
+    *   `python3-smbus`: Required for I2C communication.
+        ```bash
+        sudo apt-get update
+        sudo apt-get install python3-smbus
+        ```
+    *   `Raspbot_Lib.py`: (Included) This library works with the Raspbot hardware.
 
 ## How to Run
 
-1.  Make sure `YB_Pcb_Car.py` is in the same directory as `IR_Car_Drive.py`.
+1.  Ensure `Raspbot_Lib.py` is in the same directory as `IR_Car_Drive.py`.
 2.  Run the script:
     ```bash
     sudo python3 IR_Car_Drive.py
@@ -29,15 +29,16 @@ This project contains a Python script `IR_Car_Drive.py` designed to control the 
 | :--- | :--- |
 | **Up** | Move Forward |
 | **Down** | Move Backward |
-| **Left** | Move Side Left |
-| **Right** | Move Side Right |
+| **Left** | Slide Left (Mechanum) |
+| **Right** | Slide Right (Mechanum) |
 | **Turn Left** | Rotate Left |
 | **Turn Right** | Rotate Right |
 | **Power** | Stop |
+| **0 / 5** | Stop |
 | **+** | Increase Speed |
 | **-** | Decrease Speed |
 
 ## Troubleshooting
 
-*   **Motors not moving?** Verify that `YB_Pcb_Car.py` is correctly importing and communicating with the I2C bus. You may need to enable I2C in `raspi-config`.
-*   **IR not responding?** The script currently uses a placeholder for IR reading logic. For the best experience, configure `lirc` on your Raspberry Pi to map IR signals to system keys or use `evdev` to read the input device directly.
+*   **Motors not moving?** Ensure the battery is charged and the motor switch is ON.
+*   **IR not responding?** Point the remote directly at the IR receiver. Make sure the IR switch is enabled (the script does this automatically).
