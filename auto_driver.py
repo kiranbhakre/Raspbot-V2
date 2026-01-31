@@ -14,6 +14,7 @@ class ObstacleAvoidance:
         # State Machine
         self.state = 'IDLE' # IDLE, FORWARD, BACKING_UP, TURNING
         self.state_start_time = 0
+        self.last_check_time = 0
 
     def start(self):
         self.car.enable_ultrasonic(True)
@@ -21,6 +22,7 @@ class ObstacleAvoidance:
         self.running = True
         self.state = 'FORWARD'
         self.car.move_forward()
+        self.last_check_time = time.time()
         print(f"Obstacle Avoidance Started")
 
     def stop(self):
@@ -46,29 +48,29 @@ class ObstacleAvoidance:
             if current_time - self.state_start_time > 0.5:
                 self.car.stop()
                 self.state = 'FORWARD' # Try moving forward/checking again
-                # Small pause to stabilize?
-                # We can add a 'WAIT' state if needed, but let's try direct transition
-            return # Don't check sensors while backing up
+            return
 
         elif self.state == 'TURNING':
             # Check if we are done turning (0.4s duration)
             if current_time - self.state_start_time > 0.4:
                 self.car.stop()
                 self.state = 'FORWARD'
-            return # Don't check sensors while turning
+            return
             
         elif self.state == 'FORWARD':
-            # We are moving forward (or just finished an action), check sensors
+            # We are moving forward Use throttling to avoid I2C flooding
+            # Only check sensors every 100ms (0.1s)
             
+            if current_time - self.last_check_time < 0.1:
+                return # Skip checking this loop iteration
+            
+            self.last_check_time = current_time
+            
+            # Now we check
             dis = self.car.get_distance()
             
             # Safety checks for bad readings
             if dis == 0 or dis > 4500:
-                # self.car.stop()
-                # Stop momentarily or just ignore?
-                # If we stop here, we need a way to resume.
-                # Let's just return and keep current momentum, unless it persists?
-                # Safer: Stop.
                 self.car.stop()
                 return
 
@@ -88,9 +90,6 @@ class ObstacleAvoidance:
                 
             else:
                 # Path Clear, ensure moving forward
-                # Only send command if not already moving to avoid I2C flooding?
-                # CarDriver doesn't cache state, so we just send it.
-                # Maybe only every X intervals?
-                # For now, just send it, but maybe throttle?
+                # Repeating this command might flood I2C too if not careful
+                # But since we are throttled to 10hz, it should be fine.
                 self.car.move_forward()
-                
