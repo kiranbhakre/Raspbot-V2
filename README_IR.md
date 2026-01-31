@@ -1,7 +1,14 @@
 
 # IR Control Setup for Raspbot V2
 
-This project contains a Python script `IR_Car_Drive.py` designed to control the Yahboom Raspbot V2 using an IR remote.
+This project contains a modular Python control system for the Yahboom Raspbot V2 using an IR remote.
+
+## File Structure
+
+*   `remote_control_main.py`: **Main Entry Point**. Run this script to start the remote control program.
+*   `car_driver.py`: Class `CarDriver` handling motor movements and light control.
+*   `ir_decoder.py`: Class `IRRemote` handling IR signal reception and decoding.
+*   `Raspbot_Lib.py`: Low-level hardware driver.
 
 ## Prerequisites
 
@@ -13,14 +20,12 @@ This project contains a Python script `IR_Car_Drive.py` designed to control the 
         sudo apt-get update
         sudo apt-get install python3-smbus
         ```
-    *   `Raspbot_Lib.py`: (Included) This library works with the Raspbot hardware.
 
 ## How to Run
 
-1.  Ensure `Raspbot_Lib.py` is in the same directory as `IR_Car_Drive.py`.
-2.  Run the script:
+1.  Run the main script:
     ```bash
-    sudo python3 IR_Car_Drive.py
+    sudo python3 remote_control_main.py
     ```
 
 ## Key Mappings
