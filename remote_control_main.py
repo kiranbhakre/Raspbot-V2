@@ -94,7 +94,8 @@ def main():
             if mode == 'AUTO':
                 avoidance.step()
             
-            time.sleep(0.05)
+            # Reduced sleep for better responsiveness
+            time.sleep(0.01)
 
     except KeyboardInterrupt:
         print("\nStopping...")

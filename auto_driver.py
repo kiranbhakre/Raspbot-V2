@@ -10,57 +10,87 @@ class ObstacleAvoidance:
         self.NEAR_DISTANCE = 300 # Back up if closer than 30cm
         self.FAR_DISTANCE = 500  # Turn if closer than 50cm
         self.DEFAULT_SPEED = 40  # Slower speed for safety
+        
+        # State Machine
+        self.state = 'IDLE' # IDLE, FORWARD, BACKING_UP, TURNING
+        self.state_start_time = 0
 
     def start(self):
         self.car.enable_ultrasonic(True)
         self.car.set_speed(self.DEFAULT_SPEED)
         self.running = True
-        print(f"Obstacle Avoidance Started (Safe Distance: {self.NEAR_DISTANCE}mm)")
+        self.state = 'FORWARD'
+        self.car.move_forward()
+        print(f"Obstacle Avoidance Started")
 
     def stop(self):
         self.running = False
         self.car.enable_ultrasonic(False)
         self.car.stop()
+        self.state = 'IDLE'
         print("Obstacle Avoidance Mode Stopped")
 
     def step(self):
         """
-        Execute one step of the avoidance logic.
+        Non-blocking step function.
         """
         if not self.running:
             return
 
-        dis = self.car.get_distance()
+        current_time = time.time()
         
-        # SAFETY CHECK: 0 usually means error/timeout.
-        # If we ignore it, the car keeps its previous state (moving).
-        # We MUST stop if we don't know where we are.
-        if dis == 0 or dis > 4500:
-            # print("Sensor Invalid (0mm). Stopping for safety.")
-            self.car.stop()
-            return
+        # --- State Machine Logic ---
+        
+        if self.state == 'BACKING_UP':
+            # Check if we are done backing up (0.5s duration)
+            if current_time - self.state_start_time > 0.5:
+                self.car.stop()
+                self.state = 'FORWARD' # Try moving forward/checking again
+                # Small pause to stabilize?
+                # We can add a 'WAIT' state if needed, but let's try direct transition
+            return # Don't check sensors while backing up
 
-        # print(f"Auto Distance: {dis}mm")
+        elif self.state == 'TURNING':
+            # Check if we are done turning (0.4s duration)
+            if current_time - self.state_start_time > 0.4:
+                self.car.stop()
+                self.state = 'FORWARD'
+            return # Don't check sensors while turning
+            
+        elif self.state == 'FORWARD':
+            # We are moving forward (or just finished an action), check sensors
+            
+            dis = self.car.get_distance()
+            
+            # Safety checks for bad readings
+            if dis == 0 or dis > 4500:
+                # self.car.stop()
+                # Stop momentarily or just ignore?
+                # If we stop here, we need a way to resume.
+                # Let's just return and keep current momentum, unless it persists?
+                # Safer: Stop.
+                self.car.stop()
+                return
 
-        if dis < self.NEAR_DISTANCE:
-            # Emergency Stop & Back up
-            print(f"OBSTACLE ({dis}mm)! Backing up...")
-            self.car.stop() 
-            self.car.move_backward()
-            time.sleep(0.4) # Commit to backing up for 0.4s
-            self.car.stop() # Then stop before reassessing
-            
-        elif dis <= self.FAR_DISTANCE:
-            # Too close to proceed, turn away
-            print(f"Object detected ({dis}mm). Turning...")
-            self.car.stop()
-            self.car.rotate_left()
-            time.sleep(0.3) # Commit to turning
-            self.car.stop()
-            
-        else:
-            # Clear path
-            self.car.move_forward()
-            
-        # Pacing
-        time.sleep(0.05)
+            if dis < self.NEAR_DISTANCE:
+                print(f"OBSTACLE ({dis}mm)! Backing up...")
+                self.car.stop()
+                self.car.move_backward()
+                self.state = 'BACKING_UP'
+                self.state_start_time = current_time
+                
+            elif dis <= self.FAR_DISTANCE:
+                print(f"Object detected ({dis}mm). Turning...")
+                self.car.stop()
+                self.car.rotate_left()
+                self.state = 'TURNING'
+                self.state_start_time = current_time
+                
+            else:
+                # Path Clear, ensure moving forward
+                # Only send command if not already moving to avoid I2C flooding?
+                # CarDriver doesn't cache state, so we just send it.
+                # Maybe only every X intervals?
+                # For now, just send it, but maybe throttle?
+                self.car.move_forward()
+                
