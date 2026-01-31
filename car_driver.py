@@ -13,6 +13,7 @@ except ImportError:
         def Ctrl_IR_Switch(self, state): pass
         def read_data_array(self, reg, count): return [255]
         def Ctrl_WQ2812_ALL(self, state, color): pass
+        def Ctrl_Ulatist_Switch(self, state): pass
 
 class CarDriver:
     def __init__(self):
@@ -48,7 +49,7 @@ class CarDriver:
         self.bot.Ctrl_Car(1, 0, s)
         self.bot.Ctrl_Car(2, 0, s)
         self.bot.Ctrl_Car(3, 0, s)
-        print("Moving Forward")
+        # print("Moving Forward")
 
     def move_backward(self):
         s = self.speed
@@ -56,7 +57,7 @@ class CarDriver:
         self.bot.Ctrl_Car(1, 1, s)
         self.bot.Ctrl_Car(2, 1, s)
         self.bot.Ctrl_Car(3, 1, s)
-        print("Moving Backward")
+        # print("Moving Backward")
 
     def slide_left(self):
         s = self.speed
@@ -109,3 +110,25 @@ class CarDriver:
     def get_bot_instance(self):
         """Return the underlying bot instance if needed by other modules (like IR)"""
         return self.bot
+        
+    def enable_ultrasonic(self, enable=True):
+        """Enable or disable the ultrasonic sensor"""
+        try:
+            self.bot.Ctrl_Ulatist_Switch(1 if enable else 0)
+            print(f"Ultrasonic Sensor {'Enabled' if enable else 'Disabled'}")
+        except:
+            print("Failed to toggle Ultrasonic Sensor")
+
+    def get_distance(self):
+        """
+        Get distance from ultrasonic sensor in mm.
+        Returns distance or 0 if read fails.
+        """
+        try:
+            # 0x1b is High byte, 0x1a is Low byte
+            diss_H = self.bot.read_data_array(0x1b, 1)[0]
+            diss_L = self.bot.read_data_array(0x1a, 1)[0]
+            dis = (diss_H << 8) | diss_L
+            return dis
+        except:
+            return 0

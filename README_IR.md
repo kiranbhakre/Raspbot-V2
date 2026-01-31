@@ -3,23 +3,25 @@
 
 This project contains a modular Python control system for the Yahboom Raspbot V2 using an IR remote.
 
+## Features
+
+1.  **Manual Control**: Drive the car using the directional buttons.
+2.  **Obstacle Avoidance**: Autonomous mode using the ultrasonic sensor.
+3.  **Light Control**: Cycle through RGB colors.
+
 ## File Structure
 
 *   `remote_control_main.py`: **Main Entry Point**. Run this script to start the remote control program.
-*   `car_driver.py`: Class `CarDriver` handling motor movements and light control.
-*   `ir_decoder.py`: Class `IRRemote` handling IR signal reception and decoding.
+*   `car_driver.py`: Class `CarDriver` handling motor movements, lights, and sensors.
+*   `auto_driver.py`: Class `ObstacleAvoidance` handling autonomous logic.
+*   `ir_decoder.py`: Class `IRRemote` handling IR signal reception.
 *   `Raspbot_Lib.py`: Low-level hardware driver.
 
 ## Prerequisites
 
-1.  **Hardware**: Yahboom Raspbot V2 with IR Receiver (enabled by the script).
-2.  **System**: Raspberry Pi with I2C enabled (`sudo raspi-config` -> Interface Options -> I2C).
-3.  **Dependencies**:
-    *   `python3-smbus`: Required for I2C communication.
-        ```bash
-        sudo apt-get update
-        sudo apt-get install python3-smbus
-        ```
+1.  **Hardware**: Yahboom Raspbot V2 with IR Receiver and Ultrasonic Sensor.
+2.  **System**: Raspberry Pi with I2C enabled.
+3.  **Dependencies**: `python3-smbus`.
 
 ## How to Run
 
@@ -38,13 +40,10 @@ This project contains a modular Python control system for the Yahboom Raspbot V2
 | **Right** | Slide Right (Mechanum) |
 | **Turn Left** | Rotate Left |
 | **Turn Right** | Rotate Right |
+| **Sound** | **Toggle Obstacle Avoidance Mode** |
 | **Light** | Cycle LED Colors / Off |
 | **Power** | Stop |
-| **0 / 5** | Stop |
-| **+** | Increase Speed |
-| **-** | Decrease Speed |
+| **+ / -** | Adjustment Speed |
 
-## Troubleshooting
-
-*   **Motors not moving?** Ensure the battery is charged and the motor switch is ON.
-*   **IR not responding?** Point the remote directly at the IR receiver. Make sure the IR switch is enabled (the script does this automatically).
+### Obstacle Avoidance Mode
+Press **Sound** to enable. The car will move forward automatically. If it detects an obstacle (< 40cm), it will stop and turn left. If it gets too close (< 20cm), it will back up. Press **Sound** again to return to Manual Mode.
