@@ -1,14 +1,39 @@
 
+print("DEBUG: Script Start (Pre-imports)")
 import time
 import sys
 import signal
 
-from car_driver import CarDriver
-from ir_decoder import IRRemote
-from auto_driver import ObstacleAvoidance
+# Flush stdout to force print visibility
+sys.stdout.flush()
+
+try:
+    print("DEBUG: Importing car_driver...")
+    from car_driver import CarDriver
+    print("DEBUG: car_driver imported.")
+except Exception as e:
+    print(f"CRITICAL ERROR importing car_driver: {e}")
+    sys.exit(1)
+
+try:
+    print("DEBUG: Importing ir_decoder...")
+    from ir_decoder import IRRemote
+    print("DEBUG: ir_decoder imported.")
+except Exception as e:
+    print(f"CRITICAL ERROR importing ir_decoder: {e}")
+    sys.exit(1)
+
+try:
+    print("DEBUG: Importing auto_driver...")
+    from auto_driver import ObstacleAvoidance
+    print("DEBUG: auto_driver imported.")
+except Exception as e:
+    print(f"CRITICAL ERROR importing auto_driver: {e}")
+    sys.exit(1)
 
 def main():
-    print("DEBUG: Initializing Raspbot Remote Control...")
+    print("DEBUG: Entering main()...")
+    sys.stdout.flush()
     
     # Initialize Car Driver
     try:
@@ -16,6 +41,7 @@ def main():
         print("DEBUG: CarDriver initialized.")
     except Exception as e:
         print(f"ERROR: CarDriver init failed: {e}")
+        return
 
     # Initialize IR Remote
     try:
@@ -24,27 +50,28 @@ def main():
         print("DEBUG: IRRemote initialized.")
     except Exception as e:
         print(f"ERROR: IRRemote init failed: {e}")
+        return
     
     # Initialize Autopilot
-    avoidance = ObstacleAvoidance(car)
+    try:
+        avoidance = ObstacleAvoidance(car)
+        print("DEBUG: ObstacleAvoidance initialized.")
+    except Exception as e:
+        print(f"ERROR: ObstacleAvoidance init failed: {e}")
+        return
     
     print("Ready! Press buttons on the remote.")
-    print("Press 'Sound' (0x05) to toggle Obstacle Avoidance Mode.")
-    print("Press Ctrl+C to exit.")
     
     running = True
     mode = 'MANUAL'
-    
-    # Debug counters
     loop_count = 0
-    start_time = time.time()
 
     try:
         while running:
+            # Heartbeat to prove it's alive
             loop_count += 1
             if loop_count % 100 == 0:
-                # Print heartbeat every 100 loops (~1 sec)
-                # print(f"DEBUG: Heartbeat (Mode: {mode})")
+                # print(".", end="", flush=True) 
                 pass
 
             # Read IR Code
@@ -56,7 +83,6 @@ def main():
             
             # --- IR Handling ---
             if code is not None:
-                # print(f"DEBUG: Raw IR Code: {code}")
                 key = ir.get_key_name(code)
                 if key:
                     print(f"IR Key: {key} (Hex: {hex(code)})")
@@ -70,13 +96,10 @@ def main():
                             mode = 'MANUAL'
                             avoidance.stop()
                         
-                        # Debounce
                         time.sleep(0.3)
-                        print(f"DEBUG: Mode is now {mode}")
                         continue
 
                     if mode == 'MANUAL':
-                        # print(f"DEBUG: Executing Manual Command: {key}")
                         if key == 'Up': car.move_forward()
                         elif key == 'Down': car.move_backward()
                         elif key == 'Left': car.slide_left()
@@ -93,12 +116,10 @@ def main():
                         print(f"DEBUG: Ignored manual key {key} in AUTO mode")
                         
                 else:
-                    # print(f"DEBUG: Unknown key code {hex(code)}")
                     pass
             
             # --- Autonomous Loop ---
             if mode == 'AUTO':
-                # print("DEBUG: Calling avoidance.step()")
                 avoidance.step()
             
             time.sleep(0.01)
