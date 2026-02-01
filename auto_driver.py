@@ -6,9 +6,9 @@ class ObstacleAvoidance:
         self.car = car_driver
         self.running = False
         
-        # Tuning for better safety
-        self.NEAR_DISTANCE = 300 # Back up if closer than 30cm
-        self.FAR_DISTANCE = 500  # Turn if closer than 50cm
+        # Tuning per user request (closer approach)
+        self.NEAR_DISTANCE = 70 # Back up if closer than 10cm
+        self.FAR_DISTANCE = 150  # Turn if closer than 20cm
         self.DEFAULT_SPEED = 40  # Slower speed for safety
         
         # State Machine
