@@ -9,15 +9,30 @@ except ImportError:
     # This mock is essential for testing on non-Pi systems or if lib is missing
     print("Raspbot_Lib.py not found. Using Mock.")
     class Raspbot:
-        def Ctrl_Car(self, motor_id, motor_dir, motor_speed): pass
-        def Ctrl_IR_Switch(self, state): pass
-        def read_data_array(self, reg, count): return [255]
-        def Ctrl_WQ2812_ALL(self, state, color): pass
-        def Ctrl_Ulatist_Switch(self, state): pass
+        def __init__(self, *args, **kwargs): pass
+        def Ctrl_Car(self, *args, **kwargs): pass
+        def Ctrl_IR_Switch(self, *args, **kwargs): pass
+        def read_data_array(self, *args, **kwargs): return [255]
+        def Ctrl_WQ2812_ALL(self, *args, **kwargs): pass
+        def Ctrl_Ulatist_Switch(self, *args, **kwargs): pass
+        def Ctrl_WQ2812_brightness_ALL(self, *args, **kwargs): pass
+
+class MockRaspbot:
+    def Ctrl_Car(self, motor_id, motor_dir, motor_speed): pass
+    def Ctrl_IR_Switch(self, state): pass
+    def read_data_array(self, reg, count): return [255]
+    def Ctrl_WQ2812_ALL(self, state, color): pass
+    def Ctrl_Ulatist_Switch(self, state): pass
+    def Ctrl_WQ2812_brightness_ALL(self, r, g, b): pass
 
 class CarDriver:
     def __init__(self):
-        self.bot = Raspbot()
+        try:
+            self.bot = Raspbot()
+        except Exception as e:
+            print(f"Hardware initialization failed ({e}). Using Mock.")
+            self.bot = MockRaspbot()
+            
         self.speed = 100
         
         # Light state
@@ -25,8 +40,11 @@ class CarDriver:
         self.current_light_index = -1 
         
         # Reset
-        self.stop()
-        self.lights_off()
+        try:
+            self.stop()
+            self.lights_off()
+        except:
+            pass
 
     def set_speed(self, speed):
         """Set the movement speed (0-255)"""
@@ -122,13 +140,24 @@ class CarDriver:
     def get_distance(self):
         """
         Get distance from ultrasonic sensor in mm.
-        Returns distance or 0 if read fails.
+        Returns distance or 0 if read fails after retries.
         """
-        try:
-            # 0x1b is High byte, 0x1a is Low byte
-            diss_H = self.bot.read_data_array(0x1b, 1)[0]
-            diss_L = self.bot.read_data_array(0x1a, 1)[0]
-            dis = (diss_H << 8) | diss_L
-            return dis
-        except:
-            return 0
+        for _ in range(3): # Retry up to 3 times
+            try:
+                # 0x1b is High byte, 0x1a is Low byte
+                # Attempt to read both if possible, but Raspbot_Lib example uses separate
+                data_h = self.bot.read_data_array(0x1b, 1)
+                data_l = self.bot.read_data_array(0x1a, 1)
+                
+                if data_h and data_l:
+                    diss_H = data_h[0]
+                    diss_L = data_l[0]
+                    dis = (diss_H << 8) | diss_L
+                    if dis > 0: # Ignore 0 readings as likely errors unless they persist
+                        return dis
+                
+                time.sleep(0.01) # Small delay before retry
+            except Exception as e:
+                # print(f"DEBUG: Sonar read error: {e}")
+                time.sleep(0.01)
+        return 0

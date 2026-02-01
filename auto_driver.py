@@ -7,14 +7,15 @@ class ObstacleAvoidance:
         self.running = False
         
         # Tuning per user request (closer approach)
-        self.NEAR_DISTANCE = 100 # Back up if closer than 10cm
-        self.FAR_DISTANCE = 150  # Turn if closer than 20cm
-        self.DEFAULT_SPEED = 40  # Slower speed for safety
+        self.NEAR_DISTANCE = 150 # Back up if closer than 15cm
+        self.FAR_DISTANCE = 300  # Turn if closer than 30cm
+        self.DEFAULT_SPEED = 60  # Slightly faster but safe
         
         # State Machine
         self.state = 'IDLE' 
         self.state_start_time = 0
         self.last_check_time = 0
+        self.distance_history = [] # For filtering jitter
 
     def start(self):
         print("DEBUG: AutoDriver START requested")
@@ -61,28 +62,35 @@ class ObstacleAvoidance:
             
             self.last_check_time = current_time
             
-            # print("DEBUG: Reading Sensor...")
             dis = self.car.get_distance()
-            # print(f"DEBUG: Distance = {dis}mm")
             
-            if dis == 0 or dis > 4500:
-                # print("DEBUG: Invalid sensor read")
-                self.car.stop()
+            if dis == 0:
+                # Ignore transient 0 readings to avoid jerky stopping
                 return
 
-            if dis < self.NEAR_DISTANCE:
-                print(f"OBSTACLE ({dis}mm)! Backing up...")
+            # Keep short history for filtering
+            self.distance_history.append(dis)
+            if len(self.distance_history) > 3:
+                self.distance_history.pop(0)
+            
+            # Use average of last 3 samples
+            avg_dis = sum(self.distance_history) / len(self.distance_history)
+            
+            if avg_dis < self.NEAR_DISTANCE:
+                print(f"OBSTACLE ({avg_dis:.1f}mm)! Backing up...")
                 self.car.stop()
                 self.car.move_backward()
                 self.state = 'BACKING_UP'
                 self.state_start_time = current_time
+                self.distance_history = [] # Reset history on state change
                 
-            elif dis <= self.FAR_DISTANCE:
-                print(f"Object detected ({dis}mm). Turning...")
+            elif avg_dis <= self.FAR_DISTANCE:
+                print(f"Object detected ({avg_dis:.1f}mm). Turning...")
                 self.car.stop()
                 self.car.rotate_left()
                 self.state = 'TURNING'
                 self.state_start_time = current_time
+                self.distance_history = [] # Reset history on state change
                 
             else:
                 self.car.move_forward()

@@ -2,6 +2,7 @@ import time
 import signal
 import sys
 
+
 # Try to import Raspbot library from the local file
 try:
     from Raspbot_Lib import Raspbot
