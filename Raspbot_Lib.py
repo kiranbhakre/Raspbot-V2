@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # coding: utf-8
-import smbus
+import smbus2 as smbus
 import time,random
 import math
 

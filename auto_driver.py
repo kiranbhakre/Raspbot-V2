@@ -8,7 +8,7 @@ class ObstacleAvoidance:
         
         # Tuning per user request (closer approach)
         self.NEAR_DISTANCE = 150 # Back up if closer than 15cm
-        self.FAR_DISTANCE = 300  # Turn if closer than 30cm
+        self.FAR_DISTANCE = 200  # Turn if closer than 30cm
         self.DEFAULT_SPEED = 60  # Slightly faster but safe
         
         # State Machine
