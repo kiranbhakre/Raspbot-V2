@@ -1,2 +1,6 @@
 RPi.GPIO
 smbus2
+opencv-python
+mediapipe
+numpy
+flask
